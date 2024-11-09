@@ -41,7 +41,7 @@ def private_key_to_public_key(private_key):
     return ('04' + binascii.hexlify(sign.verifying_key.to_string()).decode('utf-8'))
 
 def public_key_to_address(public_key):
-    alphabet = "bc1q4pwed68wvd9xe3kvllumgqeh5t829yyus7fez8"
+    alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
     count = 0; val = 0
     var = hashlib.new('ripemd160')
     var.update(hashlib.sha256(binascii.unhexlify(public_key.encode())).digest())
