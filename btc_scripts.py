@@ -10,9 +10,15 @@ import base58
 import ecdsa
 import requests
 import subprocess
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 from mnemonic import Mnemonic
 from hdwallet import HDWallet
 from hdwallet.symbols import BTC
+import joblib
 
 # Function to install missing packages
 def install_missing_packages():
@@ -28,8 +34,40 @@ def install_missing_packages():
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'requests==2.19.1'])
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'mnemonic==0.18'])
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'hdwallet==1.1.1'])
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'scikit-learn'])
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'pandas'])
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'numpy'])
 
 install_missing_packages()
+
+# Load dataset and train model (this step assumes you have a dataset 'wallet_data.csv')
+def train_model():
+    data = pd.read_csv('wallet_data.csv')
+    data['balance_binary'] = np.where(data['balance'] > 0, 1, 0)
+    X = data[['address', 'private_key']]
+    y = data['balance_binary']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train_transformed = X_train.applymap(lambda x: int(hashlib.sha256(str(x).encode('utf-8')).hexdigest(), 16) % 10**8)
+    X_test_transformed = X_test.applymap(lambda x: int(hashlib.sha256(str(x).encode('utf-8')).hexdigest(), 16) % 10**8)
+    model = LogisticRegression(max_iter=1000)
+    model.fit(X_train_transformed, y_train)
+    y_pred = model.predict(X_test_transformed)
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f'Model Accuracy: {accuracy}')
+    joblib.dump(model, 'wallet_predictor_model.pkl')
+
+train_model()
+
+# Load the trained model
+model = joblib.load('wallet_predictor_model.pkl')
+
+# Prediction function
+def predict_balance(address, private_key):
+    address_hashed = int(hashlib.sha256(str(address).encode('utf-8')).hexdigest(), 16) % 10**8
+    private_key_hashed = int(hashlib.sha256(str(private_key).encode('utf-8')).hexdigest(), 16) % 10**8
+    features = np.array([[address_hashed, private_key_hashed]])
+    prediction = model.predict(features)
+    return prediction[0]
 
 # Generate mnemonic phrase and HD wallet
 def generate_hd_wallet():
@@ -87,7 +125,8 @@ def data_export(queue):
         private_key = hd_wallet.private_key()
         public_key = hd_wallet.public_key()
         address = hd_wallet.p2pkh_address()
-        queue.put((mnemonic_phrase, private_key, address), block=False)
+        if predict_balance(address, private_key) == 1:
+            queue.put((mnemonic_phrase, private_key, address), block=False)
 
 # Worker process to handle data and check balances
 def worker(queue):
