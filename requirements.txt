@@ -1,4 +1,3 @@
-numpy
-scikit-learn
-tensorflow
-transformers
+base58
+ecdsa
+requests
