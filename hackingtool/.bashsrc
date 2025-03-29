@@ -1,0 +1,2 @@
+git submodule add https://github.com/Z4nzu/hackingtool.git hackingtool
+git submodule update --init --recursive
